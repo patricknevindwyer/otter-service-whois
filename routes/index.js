@@ -13,29 +13,42 @@ var WEBHOOK_REMOTE_WHOIS = "http://localhost:8000/webhook/whois/";
 var DISPATCH_URI = "http://localhost:20000";
 var SERVICE_UUID = "";
 
-request.put(
-    {
-        uri: DISPATCH_URI + "/register", 
-        body: {
-            service: "service-whois",
-            endpoint: "" + process.env.PORT,
-            tags: ["dns", "ip"] 
+require('dns').lookup(require('os').hostname(), function (err, add, fam) {
+    registerWithDispatch(add, process.env.PORT || "3000");
+});
+
+function registerWithDispatch(addr, port) {
+    console.log("Registering as [%s:%s]", addr, port);
+    
+    request.put(
+        {
+            uri: DISPATCH_URI + "/register", 
+            body: {
+                service: "service-whois",
+                endpoint: addr + ":" + port,
+                tags: ["dns", "ip"] 
+            },
+            json: true
         },
-        json: true
-    },
-    function (err, data) {
-        
-        if (data.statusCode == 200) {
-            SERVICE_UUID = data.body.uuid;
-            console.log("Registered as [%s]", SERVICE_UUID);
-            setInterval(serviceHeartbeat, 60000);
+        function (err, data) {
+            
+            if (err) {
+                console.log("Error in registration: %s", err);
+            }
+            else {
+                if (data.statusCode == 200) {
+                    SERVICE_UUID = data.body.uuid;
+                    console.log("Registered as [%s]", SERVICE_UUID);
+                    setInterval(serviceHeartbeat, 60000);
+                }
+                else {
+                    console.log("register error: %s", err);
+                    console.log("register data: %s", JSON.stringify(data));            
+                }
+            }
         }
-        else {
-            console.log("register error: %s", err);
-            console.log("register data: %s", JSON.stringify(data));            
-        }
-    }
-)
+    );
+}
 
 // Send a heartbeat message to the dispatch service
 function serviceHeartbeat() {
